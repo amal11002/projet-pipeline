@@ -21,6 +21,7 @@ raw_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("subscribe", "weather_data") \
+    .option("startingOffsets", "earliest") \
     .load()
 
 # Conversion du format binaire Kafka en colonnes exploitables
