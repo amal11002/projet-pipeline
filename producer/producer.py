@@ -2,9 +2,13 @@ import json
 import time
 import requests
 from kafka import KafkaProducer
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-KAFKA_BROKER = 'localhost:9092'
-API_KEY = 'TON_API_KEY'
+
+KAFKA_BROKER = '127.0.0.1:9092'
+API_KEY = os.getenv('API_KEY')
 CITIES = ['Montreal', 'Quebec City', 'Toronto']
 TOPIC = 'weather_data'
 
@@ -17,6 +21,7 @@ def get_weather(city):
     }
     response = requests.get(url, params=params)
     data = response.json()
+    # print(f"Réponse API pour {city} : {data}")  # debug
     return {
         'city': city,
         'temp': data['main']['temp'],
