@@ -19,7 +19,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   postgres:
@@ -33,6 +33,15 @@ services:
       POSTGRES_DB: weather
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  processor:
+    build: ./processor
+    container_name: weather_processor
+    depends_on:
+      - kafka
+      - postgres
+    environment:
+      - KAFKA_BROKER=kafka:9092
 
 volumes:
   postgres_data:
