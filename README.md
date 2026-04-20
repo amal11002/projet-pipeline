@@ -105,6 +105,70 @@ Envoyé : {'city': 'Toronto', 'temp': 4.08, 'humidity': 75, 'wind': 6.17, ...}
 
 ## Bloc B
 
+Le Bloc B correspond au traitement temps réel des données reçues depuis Kafka avec **Spark Structured Streaming**, puis à leur écriture dans PostgreSQL.
+
+### Tester les Blocs A et B
+
+Pour tester correctement le traitement du Bloc B, il faut utiliser la branche **`test-processor`**, car elle contient les ajustements permettant de valider l’enchaînement entre :
+- le **Bloc A** : envoi des données météo dans Kafka
+- le **Bloc B** : lecture des messages Kafka, traitement Spark et écriture en base PostgreSQL
+
+**1. Récupérer la branche de test**
+
+```bash
+git fetch origin
+git checkout test-processor
+```
+
+**2. Lancer l'infrastructure**
+
+Depuis la racine du projet :
+
+```bash
+docker compose up -d --build
+```
+
+**3. Vérifier que les conteneurs tournent**
+
+```bash
+docker compose ps
+```
+
+**4. Lancer le producer pour alimenter Kafka**
+
+Dans un autre terminal :
+
+```bash
+cd producer
+python producer.py
+```
+
+**5. Vérifier les logs du processor**
+
+```bash
+docker logs -f weather_processor
+```
+
+**6. Vérifier l'écriture en base PostgreSQL**
+
+```bash
+docker exec -it postgres psql -U user -d weather -c "SELECT * FROM weather_processed ORDER BY timestamp DESC LIMIT 10;"
+```
+
+**Résultat attendu :**
+
+Le processor doit rester actif, consommer les messages du topic Kafka `weather_data`, puis écrire des lignes dans la table `weather_processed`.
+
+Exemple de résultat attendu dans PostgreSQL :
+
+```text
+    city     |      timestamp      |      avg_temp      | is_anomaly
+-------------+---------------------+--------------------+------------
+ Quebec City | 2026-04-20 20:06:27 | 2.0899999141693115 | f
+ Toronto     | 2026-04-20 20:06:27 | 5.710000038146973  | f
+ Montreal    | 2026-04-20 20:06:26 | 5.090000152587891  | f
+```
+
 ## Branches
 
 | Branche | Contenu | Responsable |
