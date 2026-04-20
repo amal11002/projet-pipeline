@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -15,13 +14,31 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - "9092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "
+      cub kafka-ready -b kafka:9092 1 30 &&
+      kafka-topics --create --if-not-exists
+      --bootstrap-server kafka:9092
+      --replication-factor 1
+      --partitions 1
+      --topic weather_data
+      "
+      
   postgres:
     image: postgres:15
     container_name: postgres
@@ -39,10 +56,11 @@ services:
     build: ./processor
     container_name: weather_processor
     depends_on:
-      - kafka
+      - kafka-init
       - postgres
     environment:
       - KAFKA_BROKER=kafka:9092
+    restart: on-failure
 
 volumes:
   postgres_data:
