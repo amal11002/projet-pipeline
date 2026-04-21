@@ -27,7 +27,7 @@ raw_stream = spark.readStream \
 weather_df = raw_stream.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), schema).alias("data")) \
     .select("data.*") \
-    .withColumn("timestamp", to_timestamp(col("timestamp")))
+    .withColumn("timestamp", to_timestamp(col("timestamp"), "yyyy-MM-dd HH:mm:ss"))
 
 def write_to_postgres(batch_df, epoch_id):
     if batch_df.rdd.isEmpty():
