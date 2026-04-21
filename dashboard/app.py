@@ -1,103 +1,110 @@
-import os
-import time
-import pandas as pd
-import psycopg2
 import streamlit as st
+import psycopg2
+import pandas as pd
 import plotly.express as px
+import time
 
-st.set_page_config(page_title="Weather Dashboard", layout="wide")
-
-DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
-DB_PORT = os.getenv("POSTGRES_PORT", "5432")
-DB_NAME = os.getenv("POSTGRES_DB", "weather")
-DB_USER = os.getenv("POSTGRES_USER", "user")
-DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "pass")
+st.set_page_config(
+    page_title="Météo en temps réel",
+    page_icon="🌤️",
+    layout="wide"
+)
 
 def get_connection():
     return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD
+        host="postgres",
+        dbname="weather",
+        user="user",
+        password="pass",
+        port=5432
     )
 
-def load_data(limit=300):
-    query = f"""
-        SELECT
-            city,
-            temperature,
-            humidity,
-            wind_speed,
-            moving_avg_5min,
-            is_anomaly,
-            event_time
-        FROM weather_processed
-        ORDER BY event_time DESC
-        LIMIT {limit};
-    """
-
-    conn = None
+def load_data():
     try:
         conn = get_connection()
-        df = pd.read_sql(query, conn)
+        df = pd.read_sql("""
+            SELECT city, timestamp, avg_temp, is_anomaly
+            FROM weather_processed
+            ORDER BY timestamp DESC
+            LIMIT 100
+        """, conn)
+        conn.close()
         return df
-    finally:
-        if conn is not None:
-            conn.close()
+    except Exception as e:
+        st.error(f"Erreur de connexion à PostgreSQL : {e}")
+        return pd.DataFrame()
 
-st.title("Dashboard météo en temps réel")
-st.caption("Rafraîchissement automatique toutes les 10 secondes")
+# ── TITRE ──────────────────────────────────────────────
+st.title("🌤️ Pipeline Météo — Temps réel")
+st.caption("Données collectées via OpenWeatherMap · Traitement Kafka + Spark · Rafraîchissement toutes les 10s")
 
-try:
-    df = load_data()
+# ── CHARGEMENT ─────────────────────────────────────────
+df = load_data()
 
-    if df.empty:
-        st.warning("Aucune donnée trouvée dans weather_processed.")
-    else:
-        df["event_time"] = pd.to_datetime(df["event_time"])
-        df = df.sort_values("event_time")
+if df.empty:
+    st.warning("Aucune donnée disponible. Vérifiez que le producteur et le processor tournent.")
+    time.sleep(10)
+    st.rerun()
 
-        col1, col2 = st.columns([2, 1])
+# ── MÉTRIQUES RÉSUMÉ ───────────────────────────────────
+st.subheader("Dernières valeurs")
+cols = st.columns(3)
+cities = ["Montreal", "Quebec City", "Toronto"]
 
-        with col1:
-            st.subheader("Courbe de température en temps réel")
-            fig = px.line(
-                df,
-                x="event_time",
-                y="temperature",
-                color="city",
-                markers=True,
-                title="Évolution de la température"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col2:
-            st.subheader("État des anomalies")
-            anomalies = df[df["is_anomaly"] == True]
-
-            if not anomalies.empty:
-                last_anomaly = anomalies.iloc[-1]
-                st.error(
-                    f"Anomalie détectée à {last_anomaly['city']} | "
-                    f"{last_anomaly['temperature']} °C"
-                )
-            else:
-                st.success("Aucune anomalie détectée")
-
-            latest = df.iloc[-1]
-            st.metric("Dernière température", f"{latest['temperature']} °C")
-            st.metric("Dernière moyenne glissante", f"{latest['moving_avg_5min']} °C")
-            st.metric("Dernière ville", f"{latest['city']}")
-
-        st.subheader("Dernières valeurs")
-        st.dataframe(
-            df.sort_values("event_time", ascending=False).head(20),
-            use_container_width=True
+for i, city in enumerate(cities):
+    city_df = df[df["city"] == city]
+    if not city_df.empty:
+        last = city_df.iloc[0]
+        anomaly = "🔴 ANOMALIE" if last["is_anomaly"] else "🟢 Normal"
+        cols[i].metric(
+            label=city,
+            value=f"{last['avg_temp']:.1f} °C",
+            delta=anomaly
         )
 
-except Exception as e:
-    st.error(f"Erreur lors du chargement des données : {e}")
+# ── GRAPHE TEMPÉRATURE ─────────────────────────────────
+st.subheader("Évolution de la température moyenne")
+df_sorted = df.sort_values("timestamp")
 
+fig = px.line(
+    df_sorted,
+    x="timestamp",
+    y="avg_temp",
+    color="city",
+    markers=True,
+    labels={"avg_temp": "Température moyenne (°C)", "timestamp": "Heure", "city": "Ville"},
+    color_discrete_map={
+        "Montreal": "#2E75B6",
+        "Quebec City": "#2E8B57",
+        "Toronto": "#C0392B"
+    }
+)
+fig.update_layout(
+    hovermode="x unified",
+    legend_title="Ville",
+    height=400
+)
+st.plotly_chart(fig, use_container_width=True)
+
+# ── ANOMALIES ──────────────────────────────────────────
+anomalies = df[df["is_anomaly"] == True]
+st.subheader("Anomalies détectées")
+if anomalies.empty:
+    st.success("Aucune anomalie détectée pour le moment.")
+else:
+    st.error(f"⚠️ {len(anomalies)} anomalie(s) détectée(s) !")
+    st.dataframe(anomalies, use_container_width=True)
+
+# ── TABLEAU COMPLET ────────────────────────────────────
+st.subheader("Historique des 100 dernières mesures")
+st.dataframe(
+    df.style.apply(
+        lambda row: ["background-color: #ffcccc" if row["is_anomaly"] else "" for _ in row],
+        axis=1
+    ),
+    use_container_width=True
+)
+
+# ── RAFRAÎCHISSEMENT ───────────────────────────────────
 time.sleep(10)
 st.rerun()
