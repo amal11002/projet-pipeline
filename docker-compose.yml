@@ -1,0 +1,80 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # Listeners (important pour Docker + Windows)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "
+      cub kafka-ready -b kafka:29092 1 30 &&
+      kafka-topics --create --if-not-exists
+      --bootstrap-server kafka:29092
+      --replication-factor 1
+      --partitions 1
+      --topic weather_data
+      "
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: weather
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts_sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  processor:
+    build: ./processor
+    container_name: weather_processor
+    depends_on:
+      - kafka-init
+      - postgres
+    environment:
+      - KAFKA_BROKER=kafka:29092
+    restart: on-failure
+
+  dashboard:
+    build: ./dashboard
+    container_name: weather_dashboard
+    ports:
+      - "8501:8501"
+    depends_on:
+      - postgres
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
