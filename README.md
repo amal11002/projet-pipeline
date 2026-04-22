@@ -2,7 +2,7 @@
 
 Projet réalisé dans le cadre du cours **8CLD876 — Conception et architecture des systèmes d'infonuagique**.
 
-```
+
 
 ## Structure du projet
 
