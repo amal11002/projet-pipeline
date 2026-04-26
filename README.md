@@ -3,7 +3,6 @@
 Projet réalisé dans le cadre du cours **8CLD876 — Conception et architecture des systèmes d'infonuagique**.
 
 
-
 ## Structure du projet
 
 ```
@@ -95,7 +94,7 @@ http://localhost:8501
 
 ---
 
-## Bloc A — Producteur de données
+## Bloc A : Producteur de données
 
 Le producteur est un script Python qui interroge l'API OpenWeatherMap toutes les 30 secondes pour 3 villes canadiennes (Montréal, Québec, Toronto) et envoie les données en JSON dans le topic Kafka `weather_data`.
 
@@ -105,7 +104,7 @@ Le producteur est un script Python qui interroge l'API OpenWeatherMap toutes les
 - Timestamp
 ---
 
-## Bloc B — Traitement Spark Structured Streaming
+## Bloc B : Traitement Spark Structured Streaming
 
 Spark consomme le topic Kafka `weather_data`, calcule une moyenne de température par ville et détecte les anomalies (écart > 5°C), puis écrit les résultats dans la table PostgreSQL `weather_processed`.
 
@@ -134,7 +133,7 @@ Résultat attendu :
 
 ---
 
-## Bloc C — Dashboard Streamlit
+## Bloc C : Dashboard Streamlit
 
 Le dashboard se connecte à PostgreSQL et affiche en temps réel :
 - Courbe de température par ville
@@ -145,25 +144,13 @@ Le dashboard se connecte à PostgreSQL et affiche en temps réel :
 Accessible sur : **http://localhost:8501** — rafraîchissement automatique toutes les 10s.
 
 
-
-## Branches
-
-| Branche | Contenu | Responsable |
-|---|---|---|
-| `main` | Infrastructure Docker + README | Amal |
-| `producer` | Bloc A — Producteur Kafka | Amal |
-| `processor` | Bloc B — Traitement Spark | Coéquipier 2 |
-| `dashboard` | Bloc C — Dashboard Streamlit | Coéquipier 3 |
-
----
-
 ## Technologies utilisées
 
 | Technologie | Rôle |
 |---|---|
-| Apache Kafka | Streaming des messages météo |
-| Apache Spark Structured Streaming | Traitement temps réel, détection d'anomalies |
-| PostgreSQL | Stockage de l'historique |
-| Streamlit + Plotly | Dashboard interactif |
-| Docker Compose | Orchestration de tous les services |
-| OpenWeatherMap API | Source de données météo |
+| Apache Kafka 
+| Apache Spark Structured Streaming
+| PostgreSQL 
+| Streamlit + Plotly 
+| Docker Compose 
+| OpenWeatherMap API 
